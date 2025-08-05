@@ -1,7 +1,6 @@
 import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 
-
 export default function RegisterPage() {
   const navigate = useNavigate();
   const [form, setForm] = useState({
@@ -48,10 +47,10 @@ export default function RegisterPage() {
         throw new Error(data.message || 'สมัครสมาชิกไม่สำเร็จ');
       }
 
-      localStorage.setItem('user', JSON.stringify({ username, email }));
+      // **ลบ localStorage.setItem('user', ...) ออก**
 
       alert('สมัครสมาชิกสำเร็จ!');
-      navigate('/login'); // ไปหน้าโปรไฟล์หลังสมัคร
+      navigate('/login'); // ไปหน้า login หลังสมัคร
     } catch (err) {
       alert(err.message);
     }

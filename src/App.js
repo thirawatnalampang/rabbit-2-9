@@ -1,7 +1,6 @@
 import React from 'react';
 import { Routes, Route } from 'react-router-dom';
 import Navbar from './components/Navbar';
-import { useAuth } from './context/AuthContext';  // เพิ่ม import useAuth
 
 import Home from './pages/Home';
 import Pets from './pages/Pets';
@@ -29,12 +28,10 @@ import BookingPage from './pages/BookingPage';
 import './App.css';
 
 function App() {
-  const { user } = useAuth();  // ดึง user จาก context
-
   return (
     <>
-      {/* เพิ่ม key ให้ Navbar เพื่อบังคับ re-render เมื่อ user เปลี่ยน */}
-      <Navbar key={user ? user.user_id : 'guest'} />
+      {/* ไม่ต้องส่ง user ผ่าน props เพราะใช้ Context */}
+      <Navbar />
 
       <div className="p-4">
         <Routes>
@@ -60,6 +57,7 @@ function App() {
           <Route path="/search" element={<SearchPage />} />
           <Route path="/parents" element={<ParentsPage />} />
           <Route path="/booking" element={<BookingPage />} />
+
           <Route path="*" element={<NotFound />} />
         </Routes>
       </div>

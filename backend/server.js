@@ -331,4 +331,3 @@ app.delete('/api/users/:id', async (req, res) => {
     res.status(500).json({ error: 'Failed to delete user' });
   }
 });
-
