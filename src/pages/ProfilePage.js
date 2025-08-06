@@ -99,60 +99,66 @@ export default function ProfilePage() {
   };
 
   const handleSave = async () => {
-  try {
-    const phoneValue = phoneRef.current.value.trim();
+    try {
+      const phoneValue = phoneRef.current.value.trim();
 
-    // ✅ เช็คเฉพาะเมื่อมีการกรอก
-    if (phoneValue !== '' && phoneValue.length !== 10) {
-      alert('กรุณากรอกเบอร์โทรศัพท์ให้ครบ 10 ตัว');
-      return; // ❌ ยกเลิกการบันทึก
+      if (phoneValue !== '' && phoneValue.length !== 10) {
+        alert('กรุณากรอกเบอร์โทรศัพท์ให้ครบ 10 ตัว');
+        return;
+      }
+
+      let profileImageUrl = user.profileImage;
+
+      if (selectedImage) {
+        const formData = new FormData();
+        formData.append('profileImage', selectedImage);
+        const uploadRes = await fetch('/api/upload', { method: 'POST', body: formData });
+        if (!uploadRes.ok) throw new Error('❌ อัปโหลดรูปไม่สำเร็จ');
+        const uploadData = await uploadRes.json();
+        profileImageUrl = uploadData.url + '?t=' + new Date().getTime();
+      }
+
+      const updatedUser = {
+        username: usernameRef.current.value,
+        email: emailRef.current.value,
+        phone: phoneValue,
+        address: addressRef.current.value,
+        gender: gender,
+        profileImage: profileImageUrl,
+      };
+
+      const res = await fetch(`/api/users/${user.user_id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(updatedUser),
+      });
+
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || '❌ บันทึกข้อมูลไม่สำเร็จ');
+
+      login({
+        user_id: data.user_id,
+        username: data.username,
+        email: data.email || '',
+        phone: data.phone || '',
+        address: data.address || '',
+        gender: data.gender || '',
+        profileImage: data.profile_image || null,
+      });
+
+      alert('✅ บันทึกข้อมูลสำเร็จ');
+      setSelectedImage(null);
+    } catch (err) {
+      alert(err.message);
     }
+  };
 
-    let profileImageUrl = user.profileImage;
+  // ฟังก์ชัน logout สำหรับปุ่ม Logout
+  const handleLogout = () => {
+    logout();
+    window.location.reload();
+  };
 
-    if (selectedImage) {
-      const formData = new FormData();
-      formData.append('profileImage', selectedImage);
-      const uploadRes = await fetch('/api/upload', { method: 'POST', body: formData });
-      if (!uploadRes.ok) throw new Error('❌ อัปโหลดรูปไม่สำเร็จ');
-      const uploadData = await uploadRes.json();
-      profileImageUrl = uploadData.url + '?t=' + new Date().getTime();
-    }
-
-    const updatedUser = {
-      username: usernameRef.current.value,
-      email: emailRef.current.value,
-      phone: phoneValue,
-      address: addressRef.current.value,
-      gender: gender,
-      profileImage: profileImageUrl,
-    };
-
-    const res = await fetch(`/api/users/${user.user_id}`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(updatedUser),
-    });
-
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.error || '❌ บันทึกข้อมูลไม่สำเร็จ');
-
-    login({
-      user_id: data.user_id,
-      username: data.username,
-      email: data.email || '',
-      phone: data.phone || '',
-      address: data.address || '',
-      gender: data.gender || '',
-      profileImage: data.profile_image || null,
-    });
-
-    alert('✅ บันทึกข้อมูลสำเร็จ');
-    setSelectedImage(null);
-  } catch (err) {
-    alert(err.message);
-  }
-};
   return (
     <div className="flex h-screen bg-black text-white">
       <div className="w-20 md:w-48 bg-black flex flex-col items-center py-6 space-y-10">
@@ -170,7 +176,6 @@ export default function ProfilePage() {
 
         <div className="flex flex-col items-center mb-6">
           <div className="relative w-24 h-24 rounded-full overflow-hidden border-4 border-white flex items-center justify-center bg-gray-200">
-            {/* แสดงรูปถ้ามี */}
             {(previewUrl || user.profileImage) ? (
               <img
                 src={previewUrl || user.profileImage}
@@ -178,7 +183,6 @@ export default function ProfilePage() {
                 className="w-full h-full object-cover"
               />
             ) : (
-              // ถ้าไม่มีรูป แสดงไอคอนคนแทน
               <svg
                 xmlns="http://www.w3.org/2000/svg"
                 className="w-12 h-12 text-gray-500"
@@ -302,10 +306,7 @@ export default function ProfilePage() {
 
         <div className="mt-8 flex justify-end">
           <button
-            onClick={() => {
-              logout();
-              window.location.reload();
-            }}
+            onClick={handleLogout}
             className="bg-black text-white px-6 py-2 rounded-full font-semibold hover:bg-gray-800 transition"
           >
             Logout

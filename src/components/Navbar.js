@@ -16,13 +16,14 @@ export default function Navbar() {
   const { user } = useAuth();
   const navigate = useNavigate();
   const [searchQuery, setSearchQuery] = useState('');
-
+  
+  
   const handleSearch = () => {
     if (searchQuery.trim() !== '') {
       navigate(`/search?query=${encodeURIComponent(searchQuery.trim())}`);
     }
   };
-
+ 
   return (
     <nav className="bg-black text-white p-4 flex justify-between items-center shadow-md" key={user?.user_id || 'guest'}>
       <button
