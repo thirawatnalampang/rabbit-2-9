@@ -1,3 +1,4 @@
+// AuthContext.js
 import { createContext, useContext, useState, useEffect } from 'react';
 
 const AuthContext = createContext();
@@ -17,16 +18,22 @@ export function AuthProvider({ children }) {
   }, [user]);
 
   const login = (userData) => {
-    const fullUserData = {
-      user_id: userData.user_id,
-      username: userData.username,
-      email: userData.email || '',
-      phone: userData.phone || '',
-      address: userData.address || '',
-      gender: userData.gender || '',
-      profileImage: userData.profileImage || userData.profile_image || '',
-    };
-    setUser(fullUserData);
+    setUser((prevUser) => {
+      const genderToUse = prevUser?.gender || userData.gender || '';
+      const fullUserData = {
+        user_id: userData.user_id,
+        username: userData.username,
+        email: userData.email || '',
+        phone: userData.phone || '',
+        address: userData.address || '',
+        gender: genderToUse,
+        profileImage: userData.profileImage || userData.profile_image || '',
+        role: userData.role || 'user',
+      };
+      // console.log แค่ครั้งเดียวเมื่อ login จริงๆ
+      if (!prevUser) console.log('Login userData:', fullUserData);
+      return fullUserData;
+    });
   };
 
   const logout = () => {
@@ -35,8 +42,7 @@ export function AuthProvider({ children }) {
   };
 
   const loginWithGoogle = async () => {
-    // ตัวอย่างจำลอง login ด้วย Google
-    const googleUser = {
+    setUser({
       user_id: 9999,
       username: 'google_user',
       email: 'google@example.com',
@@ -44,8 +50,8 @@ export function AuthProvider({ children }) {
       address: '',
       gender: '',
       profileImage: '',
-    };
-    setUser(googleUser);
+      role: 'user',
+    });
   };
 
   return (

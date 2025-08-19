@@ -8,7 +8,7 @@ export default function ProfilePage() {
 
   const [selectedImage, setSelectedImage] = useState(null);
   const [previewUrl, setPreviewUrl] = useState(null);
-  const [gender, setGender] = useState(user?.gender || '');
+  const [gender, setGender] = useState('');
 
   const usernameRef = useRef();
   const emailRef = useRef();
@@ -16,46 +16,41 @@ export default function ProfilePage() {
   const addressRef = useRef();
   const fileInputRef = useRef();
 
+  // Fetch user data on mount (เฉพาะครั้งแรก)
   useEffect(() => {
     if (!user) {
       navigate('/login');
       return;
     }
 
-    async function fetchUser() {
+    const fetchUser = async () => {
       try {
         const res = await fetch(`/api/users/${user.user_id}`);
         if (!res.ok) throw new Error('Failed to fetch user data');
         const data = await res.json();
 
+        const profileUrl = data.profile_image ? data.profile_image + '?t=' + Date.now() : null;
+
+        setGender(data.gender || '');
+        setPreviewUrl(profileUrl);
+
+        // อัปเดต context แค่ profileImage ไม่ไปเปลี่ยน gender
         login({
-          user_id: data.user_id,
-          username: data.username,
-          email: data.email || '',
-          phone: data.phone || '',
-          address: data.address || '',
-          gender: data.gender || '',
-          profileImage: data.profile_image || null,
+          ...user,
+          profileImage: profileUrl,
         });
       } catch (err) {
         console.error(err);
       }
-    }
+    };
 
     fetchUser();
-  }, [user, navigate, login]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
+  // Update preview URL for selected image
   useEffect(() => {
-    if (user?.gender !== undefined) {
-      setGender(user.gender || '');
-    }
-  }, [user?.gender]);
-
-  useEffect(() => {
-    if (!selectedImage) {
-      setPreviewUrl(null);
-      return;
-    }
+    if (!selectedImage) return;
     const objectUrl = URL.createObjectURL(selectedImage);
     setPreviewUrl(objectUrl);
     return () => URL.revokeObjectURL(objectUrl);
@@ -63,26 +58,41 @@ export default function ProfilePage() {
 
   if (!user) return null;
 
-  const uploadAndUpdateProfileImage = async (file) => {
+  // Upload profile image
+  const handleImageChange = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    setSelectedImage(file);
+
     try {
       const formData = new FormData();
       formData.append('profileImage', file);
-      const uploadRes = await fetch('/api/upload', { method: 'POST', body: formData });
-      if (!uploadRes.ok) throw new Error('❌ อัปโหลดรูปไม่สำเร็จ');
+
+      const uploadRes = await fetch('/api/upload', {
+        method: 'POST',
+        body: formData,
+      });
       const uploadData = await uploadRes.json();
-      const imageUrl = uploadData.url;
+      if (!uploadRes.ok) throw new Error(uploadData.error || 'Upload failed');
+
+      const newProfileUrl = uploadData.url + '?t=' + Date.now();
 
       const updateRes = await fetch(`/api/users/${user.user_id}/profile-image`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ profileImage: imageUrl }),
+        body: JSON.stringify({ profileImage: newProfileUrl }),
       });
       const updateData = await updateRes.json();
-      if (!updateRes.ok) throw new Error(updateData.error || '❌ เปลี่ยนรูปไม่สำเร็จ');
+      if (!updateRes.ok) throw new Error(updateData.error || 'Update failed');
 
-      const imageUrlWithTimestamp = imageUrl + '?t=' + new Date().getTime();
-      login({ ...updateData.user, profileImage: imageUrlWithTimestamp });
-      setPreviewUrl(imageUrlWithTimestamp);
+      login({
+        ...updateData.user,
+        profileImage: newProfileUrl,
+        role: updateData.user.role || 'user',
+      });
+
+      setPreviewUrl(newProfileUrl);
       setSelectedImage(null);
     } catch (err) {
       console.error(err);
@@ -90,32 +100,12 @@ export default function ProfilePage() {
     }
   };
 
-  const handleImageChange = (e) => {
-    const file = e.target.files[0];
-    if (file) {
-      setSelectedImage(file);
-      uploadAndUpdateProfileImage(file);
-    }
-  };
-
   const handleSave = async () => {
     try {
       const phoneValue = phoneRef.current.value.trim();
-
       if (phoneValue !== '' && phoneValue.length !== 10) {
         alert('กรุณากรอกเบอร์โทรศัพท์ให้ครบ 10 ตัว');
         return;
-      }
-
-      let profileImageUrl = user.profileImage;
-
-      if (selectedImage) {
-        const formData = new FormData();
-        formData.append('profileImage', selectedImage);
-        const uploadRes = await fetch('/api/upload', { method: 'POST', body: formData });
-        if (!uploadRes.ok) throw new Error('❌ อัปโหลดรูปไม่สำเร็จ');
-        const uploadData = await uploadRes.json();
-        profileImageUrl = uploadData.url + '?t=' + new Date().getTime();
       }
 
       const updatedUser = {
@@ -123,8 +113,8 @@ export default function ProfilePage() {
         email: emailRef.current.value,
         phone: phoneValue,
         address: addressRef.current.value,
-        gender: gender,
-        profileImage: profileImageUrl,
+        gender,
+        profileImage: previewUrl || user.profileImage,
       };
 
       const res = await fetch(`/api/users/${user.user_id}`, {
@@ -132,9 +122,10 @@ export default function ProfilePage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(updatedUser),
       });
-
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || '❌ บันทึกข้อมูลไม่สำเร็จ');
+      if (!res.ok) throw new Error(data.error || 'บันทึกข้อมูลไม่สำเร็จ');
+
+      const profileUrl = data.profile_image ? data.profile_image + '?t=' + Date.now() : null;
 
       login({
         user_id: data.user_id,
@@ -142,18 +133,18 @@ export default function ProfilePage() {
         email: data.email || '',
         phone: data.phone || '',
         address: data.address || '',
-        gender: data.gender || '',
-        profileImage: data.profile_image || null,
+        gender: data.gender || gender, // ใช้ local gender ถ้า data.gender ไม่มี
+        profileImage: profileUrl,
+        role: data.role || 'user',
       });
 
+      setPreviewUrl(profileUrl);
       alert('✅ บันทึกข้อมูลสำเร็จ');
-      setSelectedImage(null);
     } catch (err) {
       alert(err.message);
     }
   };
 
-  // ฟังก์ชัน logout สำหรับปุ่ม Logout
   const handleLogout = () => {
     logout();
     window.location.reload();
@@ -168,6 +159,7 @@ export default function ProfilePage() {
       <div className="flex-1 bg-white text-black rounded-tl-3xl p-8 overflow-auto">
         <h2 className="text-xl font-bold mb-4">EDIT YOUR PROFILE</h2>
 
+        {/* Profile Image */}
         <div className="flex flex-col items-center mb-6">
           <div className="relative w-24 h-24 rounded-full overflow-hidden border-4 border-white flex items-center justify-center bg-gray-200">
             {(previewUrl || user.profileImage) ? (
@@ -214,7 +206,6 @@ export default function ProfilePage() {
                 />
               </svg>
             </button>
-
             <input
               type="file"
               ref={fileInputRef}
@@ -225,6 +216,7 @@ export default function ProfilePage() {
           </div>
         </div>
 
+        {/* Input Fields */}
         <div className="space-y-4 max-w-md mx-auto">
           <div>
             <label className="block text-sm font-semibold mb-1">Username</label>
@@ -253,16 +245,6 @@ export default function ProfilePage() {
               className="w-full border-b border-black focus:outline-none p-1"
               defaultValue={user.phone}
               maxLength={10}
-              pattern="\d{10}"
-              title="กรุณากรอกเบอร์โทรศัพท์ 10 ตัวเลข"
-              onKeyDown={(e) => {
-                if (
-                  !/[0-9]/.test(e.key) &&
-                  !['Backspace', 'Delete', 'ArrowLeft', 'ArrowRight'].includes(e.key)
-                ) {
-                  e.preventDefault();
-                }
-              }}
             />
           </div>
           <div>
@@ -289,6 +271,7 @@ export default function ProfilePage() {
           </div>
         </div>
 
+        {/* Buttons */}
         <div className="mt-6 text-center">
           <button
             onClick={handleSave}
@@ -297,7 +280,6 @@ export default function ProfilePage() {
             บันทึก
           </button>
         </div>
-
         <div className="mt-8 flex justify-end">
           <button
             onClick={handleLogout}

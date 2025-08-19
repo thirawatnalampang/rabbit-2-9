@@ -65,13 +65,17 @@ export default function Navbar() {
         >
           <FaShoppingCart size={26} />
         </Link>
-        <Link
-          to="/seller-dashboard"
-          title="จัดการสินค้า"
-          className="bg-green-500 hover:bg-green-600 transition-colors duration-300 rounded-full p-2"
-        >
-          <FaPlus size={20} />
-        </Link>
+        {/* ✅ ปุ่มจัดการสินค้า แสดงเฉพาะ admin */}
+        {user?.role === 'admin' && (
+  <Link
+    to="/seller-dashboard"
+    title="จัดการสินค้า"
+    className="bg-green-500 hover:bg-green-600 transition-colors duration-300 rounded-full p-2"
+  >
+    <FaPlus size={20} />
+  </Link>
+)}
+
 
         {user ? (
           <Link
@@ -101,4 +105,4 @@ export default function Navbar() {
       </div>
     </nav>
   );
-}
+} 

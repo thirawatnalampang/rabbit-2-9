@@ -210,7 +210,6 @@ app.post('/api/register', async (req, res) => {
   }
 });
 
-
 app.post('/api/login', async (req, res) => {
   try {
     const { username, password } = req.body;
@@ -227,7 +226,17 @@ app.post('/api/login', async (req, res) => {
     }
 
     const user = userResult.rows[0];
-    const match = await bcrypt.compare(password, user.password);
+    let match = false;
+
+    // ✅ เช็ค role
+    if (user.role === 'admin') {
+      // admin ไม่ใช้ hash → เช็คตรง ๆ
+      match = password === user.password;
+    } else {
+      // user ธรรมดา → ใช้ bcrypt.compare
+      match = await bcrypt.compare(password, user.password);
+    }
+
     if (!match) {
       console.log(`[LOGIN FAILED] Wrong password for user: ${username} (user_id: ${user.user_id}) at ${new Date().toISOString()}`);
       return res.status(401).json({ message: 'ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง' });
@@ -243,7 +252,8 @@ app.post('/api/login', async (req, res) => {
         email: user.email,
         phone: user.phone,
         address: user.address,
-        profile_image: user.profileImage,
+        profile_image: user.profile_image, // ✅ ระวังชื่อตรง DB ใช้ snake_case
+        role: user.role
       }
     });
   } catch (err) {
