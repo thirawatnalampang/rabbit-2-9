@@ -1,94 +1,201 @@
-import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom'; // เพิ่มบรรทัดนี้
+import React, { useState } from "react";
+import { useNavigate } from "react-router-dom";
+
+const API_BASE = process.env.REACT_APP_API_BASE || "http://localhost:3000";
 
 export default function AddRabbitForm() {
-  const [name, setName] = useState('');
-  const [breed, setBreed] = useState('');
-  const [age, setAge] = useState('');
-  const [gender, setGender] = useState('');
-  const [price, setPrice] = useState('');
-  const [image, setImage] = useState(null);
+  const [name, setName] = useState("");
+  const [breed, setBreed] = useState("");
+  const [age, setAge] = useState("");
+  const [gender, setGender] = useState("male");
+  const [price, setPrice] = useState("");
+  const [file, setFile] = useState(null);
+  const [preview, setPreview] = useState(null);
+  const [submitting, setSubmitting] = useState(false);
 
-  const navigate = useNavigate(); // เพิ่มตัวแปรนี้
+  const navigate = useNavigate();
 
   const handleImageUpload = (e) => {
-    setImage(URL.createObjectURL(e.target.files[0]));
+    const f = e.target.files?.[0];
+    if (!f) return;
+    setFile(f);
+    setPreview(URL.createObjectURL(f));
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    const newRabbit = { name, breed, age, gender, price, image };
-    console.log('ข้อมูลกระต่าย:', newRabbit);
+    if (!name || !price) {
+      alert("กรอกชื่อและราคา");
+      return;
+    }
 
-    // 📌 TODO: ส่ง newRabbit ไปเก็บใน backend หรือ state หลัก
+    try {
+      setSubmitting(true);
 
-    // กลับไปหน้าแสดงรายการกระต่ายหลังบันทึก
-    navigate('/');
+      let image_url = "";
+      if (file) {
+        const fd = new FormData();
+        fd.append("profileImage", file);
+        const up = await fetch(`${API_BASE}/api/upload`, {
+          method: "POST",
+          body: fd,
+        });
+        if (!up.ok) {
+          const t = await up.text();
+          throw new Error(`อัปโหลดรูปไม่สำเร็จ: ${t}`);
+        }
+        const r = await up.json();
+        image_url = r.url;
+      }
+
+      const payload = {
+        name,
+        breed: breed || null,
+        age: age ? Number(age) : null,
+        gender,
+        price: Number(price),
+        description: null,
+        image_url,
+        status: "available",
+      };
+
+      const save = await fetch(`${API_BASE}/api/admin/rabbits`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      if (!save.ok) {
+        const t = await save.text();
+        throw new Error(`บันทึกข้อมูลไม่สำเร็จ: ${t}`);
+      }
+
+      alert("เพิ่มกระต่ายสำเร็จ");
+      navigate("/manage-rabbits");
+    } catch (err) {
+      console.error(err);
+      alert(err.message || "เกิดข้อผิดพลาด");
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (
-    <div style={{ textAlign: 'center', padding: '30px' }}>
-      <button
-        style={{
-          backgroundColor: '#fca311',
-          color: '#fff',
-          padding: '10px 20px',
-          border: 'none',
-          borderRadius: '8px',
-          fontSize: '18px'
-        }}
-      >
-        เพิ่มกระต่าย
-      </button>
+    <div className="flex justify-center items-center py-10">
+      <div className="bg-white shadow-lg rounded-xl p-8 w-full max-w-lg">
+        <h1 className="text-2xl font-bold text-center mb-6">เพิ่มกระต่าย 🐇</h1>
 
-      <form onSubmit={handleSubmit} style={{ marginTop: '30px' }}>
-        <div>
-          <label style={{ display: 'block', marginBottom: '10px' }}>
-            <input type="file" accept="image/*" onChange={handleImageUpload} hidden id="fileUpload" />
-            <div
-              style={{
-                width: '100px',
-                height: '100px',
-                border: '2px dashed gray',
-                margin: 'auto',
-                cursor: 'pointer',
-                borderRadius: '10px'
-              }}
-              onClick={() => document.getElementById('fileUpload').click()}
-            >
-              {image ? (
-                <img src={image} alt="Rabbit" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-              ) : (
-                <span>+</span>
-              )}
+        <form onSubmit={handleSubmit} className="space-y-6">
+          {/* Upload */}
+          <div className="flex justify-center">
+            <label className="cursor-pointer">
+              <input
+                type="file"
+                accept="image/*"
+                onChange={handleImageUpload}
+                hidden
+                id="fileUpload"
+              />
+              <div className="w-40 h-40 border-2 border-dashed rounded-lg flex items-center justify-center overflow-hidden hover:border-green-500 transition">
+                {preview ? (
+                  <img
+                    src={preview}
+                    alt="Rabbit"
+                    className="w-full h-full object-cover"
+                  />
+                ) : (
+                  <span className="text-4xl text-gray-400">+</span>
+                )}
+              </div>
+            </label>
+          </div>
+
+          {/* Name */}
+          <div>
+            <label className="block font-medium">ชื่อกระต่าย</label>
+            <input
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              required
+              className="mt-1 w-full border rounded-lg px-3 py-2 focus:ring focus:ring-green-300"
+            />
+          </div>
+
+          {/* Breed */}
+          <div>
+            <label className="block font-medium">พันธุ์กระต่าย</label>
+            <input
+              value={breed}
+              onChange={(e) => setBreed(e.target.value)}
+              className="mt-1 w-full border rounded-lg px-3 py-2 focus:ring focus:ring-green-300"
+            />
+          </div>
+
+          {/* Age */}
+          <div>
+            <label className="block font-medium">อายุ (ปี)</label>
+            <input
+              value={age}
+              onChange={(e) => setAge(e.target.value)}
+              type="number"
+              min="0"
+              className="mt-1 w-full border rounded-lg px-3 py-2 focus:ring focus:ring-green-300"
+            />
+          </div>
+
+          {/* Gender */}
+          <div>
+            <label className="block font-medium mb-1">เพศ</label>
+            <div className="flex gap-6">
+              <label className="flex items-center gap-2">
+                <input
+                  type="radio"
+                  name="gender"
+                  value="male"
+                  checked={gender === "male"}
+                  onChange={(e) => setGender(e.target.value)}
+                />
+                ♂ เพศผู้
+              </label>
+              <label className="flex items-center gap-2">
+                <input
+                  type="radio"
+                  name="gender"
+                  value="female"
+                  checked={gender === "female"}
+                  onChange={(e) => setGender(e.target.value)}
+                />
+                ♀ เพศเมีย
+              </label>
             </div>
-          </label>
-        </div>
+          </div>
 
-        <div style={{ marginTop: '20px' }}>
-          <label>ชื่อกระต่าย: <input value={name} onChange={(e) => setName(e.target.value)} /></label><br />
-          <label>พันธุ์กระต่าย: <input value={breed} onChange={(e) => setBreed(e.target.value)} /></label><br />
-          <label>อายุ: <input value={age} onChange={(e) => setAge(e.target.value)} /></label><br />
-          <label>เพศ:
-            <input type="radio" name="gender" value="male" onChange={(e) => setGender(e.target.value)} /> ♂
-            <input type="radio" name="gender" value="female" onChange={(e) => setGender(e.target.value)} /> ♀
-          </label><br />
-          <label>ราคา: <input value={price} onChange={(e) => setPrice(e.target.value)} /></label>
-        </div>
+          {/* Price */}
+          <div>
+            <label className="block font-medium">ราคา (บาท)</label>
+            <input
+              value={price}
+              onChange={(e) => setPrice(e.target.value)}
+              type="number"
+              min="0"
+              required
+              className="mt-1 w-full border rounded-lg px-3 py-2 focus:ring focus:ring-green-300"
+            />
+          </div>
 
-        <button
-          type="submit"
-          style={{
-            marginTop: '20px',
-            backgroundColor: '#39e75f',
-            padding: '10px 20px',
-            borderRadius: '10px',
-            fontSize: '18px'
-          }}
-        >
-          บันทึกข้อมูล
-        </button>
-      </form>
+          {/* Submit */}
+          <button
+            type="submit"
+            disabled={submitting}
+            className={`w-full py-3 rounded-lg text-white font-bold transition ${
+              submitting
+                ? "bg-green-300 cursor-not-allowed"
+                : "bg-green-500 hover:bg-green-600"
+            }`}
+          >
+            {submitting ? "กำลังบันทึก..." : "บันทึกข้อมูล"}
+          </button>
+        </form>
+      </div>
     </div>
   );
 }

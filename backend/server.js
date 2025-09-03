@@ -2,6 +2,7 @@ require('dotenv').config();
 
 const express = require('express');
 const bodyParser = require('body-parser');
+const cors = require('cors'); // ✅ เพิ่ม
 const pool = require('./db'); // เชื่อมต่อฐานข้อมูล
 const multer = require('multer');
 const path = require('path');
@@ -12,7 +13,9 @@ const nodemailer = require('nodemailer');
 const app = express();
 const port = process.env.PORT || 3000;
 
+/* ===================== Middlewares ===================== */
 app.use(bodyParser.json());
+app.use(cors({ origin: true, credentials: true })); // ✅ อนุญาตทุก origin
 
 /* ===================== Helpers (LOG & DIFF) ===================== */
 const nowISO = () => new Date().toISOString();
@@ -83,75 +86,254 @@ app.post('/api/upload', upload.single('profileImage'), (req, res) => {
   const url = `http://localhost:${port}/uploads/${req.file.filename}`;
   res.json({ url });
 });
+/* ========= Rabbit APIs ========= */
 
-/* ===================== Rabbits ===================== */
-app.get('/api/rabbits', async (_req, res) => {
+// GET list (รองรับ pagination ?page=1&limit=10)
+app.get('/api/admin/rabbits', async (req, res) => {
   try {
-    const result = await pool.query('SELECT * FROM rabbits ORDER BY rabbit_id ASC');
-    res.json(result.rows);
-  } catch (err) {
-    console.error('❌ Error fetching rabbits:', err.message);
-    res.status(500).json({ error: 'Failed to fetch rabbits' });
+    const page  = Math.max(parseInt(req.query.page || '1', 10), 1);
+    const limit = Math.max(parseInt(req.query.limit || '10', 10), 1);
+    const offset = (page - 1) * limit;
+
+    const totalQ = await pool.query('SELECT COUNT(*)::int AS total FROM rabbits');
+    const total = totalQ.rows[0].total || 0;
+
+    const rowsQ = await pool.query(
+      `SELECT rabbit_id, seller_id, name, breed, age, gender, price,
+              description, image_url, status
+       FROM rabbits
+       ORDER BY rabbit_id ASC
+       LIMIT $1 OFFSET $2`,
+      [limit, offset]
+    );
+
+    res.json({
+      page, limit, total,
+      totalPages: Math.ceil(total / limit),
+      items: rowsQ.rows
+    });
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ error: 'Server error' });
   }
 });
 
-app.get('/api/rabbits/:id', async (req, res) => {
-  const { id } = req.params;
+// POST add
+app.post('/api/admin/rabbits', async (req, res) => {
   try {
-    // แก้ให้ตรงคีย์จริงในตาราง
-    const result = await pool.query('SELECT * FROM rabbits WHERE rabbit_id = $1', [id]);
-    if (result.rows.length === 0) return res.status(404).json({ error: 'Rabbit not found' });
-    res.json(result.rows[0]);
-  } catch (err) {
-    res.status(500).json({ error: 'Failed to fetch rabbit' });
-  }
-});
+    const {
+      seller_id = null,
+      name, breed = null, age = null, gender = null,
+      price, description = null, image_url = null, status = 'available'
+    } = req.body;
 
-app.post('/api/rabbits', async (req, res) => {
-  const { seller_id, name, breed, age, gender, price, description, image_url, status } = req.body;
-  try {
-    const result = await pool.query(
+    if (!name || price == null)
+      return res.status(400).json({ error: 'name และ price จำเป็น' });
+
+    const q = await pool.query(
       `INSERT INTO rabbits (seller_id, name, breed, age, gender, price, description, image_url, status)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING *`,
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
+       RETURNING rabbit_id, seller_id, name, breed, age, gender, price, description, image_url, status`,
       [seller_id, name, breed, age, gender, price, description, image_url, status]
     );
-    res.status(201).json({ message: 'Rabbit added', rabbit: result.rows[0] });
-  } catch (err) {
-    console.error('❌ Failed to add rabbit:', err.message);
-    res.status(500).json({ error: 'Failed to add rabbit' });
+    res.status(201).json(q.rows[0]);
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ error: 'Server error' });
   }
 });
 
-app.put('/api/rabbits/:id', async (req, res) => {
-  const { id } = req.params;
-  const { seller_id, name, breed, age, gender, price, description, image_url, status } = req.body;
+// PUT update
+app.put('/api/admin/rabbits/:id', async (req, res) => {
   try {
-    const result = await pool.query(
-      `UPDATE rabbits
-       SET seller_id=$1, name=$2, breed=$3, age=$4, gender=$5, price=$6, description=$7, image_url=$8, status=$9
-       WHERE rabbit_id=$10
-       RETURNING *`,
+    const { id } = req.params;
+    const {
+      seller_id, name, breed, age, gender,
+      price, description, image_url, status
+    } = req.body;
+
+    const q = await pool.query(
+      `UPDATE rabbits SET
+         seller_id = COALESCE($1, seller_id),
+         name      = COALESCE($2, name),
+         breed     = COALESCE($3, breed),
+         age       = COALESCE($4, age),
+         gender    = COALESCE($5, gender),
+         price     = COALESCE($6, price),
+         description = COALESCE($7, description),
+         image_url = COALESCE($8, image_url),
+         status    = COALESCE($9, status)
+       WHERE rabbit_id = $10
+       RETURNING rabbit_id, seller_id, name, breed, age, gender, price, description, image_url, status`,
       [seller_id, name, breed, age, gender, price, description, image_url, status, id]
     );
-    if (result.rowCount === 0) return res.status(404).json({ error: 'Rabbit not found' });
-    res.json({ message: 'Rabbit updated', rabbit: result.rows[0] });
-  } catch (err) {
-    console.error('❌ Failed to update rabbit:', err.message);
-    res.status(500).json({ error: 'Failed to update rabbit' });
+    if (q.rowCount === 0) return res.status(404).json({ error: 'not found' });
+    res.json(q.rows[0]);
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ error: 'Server error' });
   }
 });
 
-app.delete('/api/rabbits/:id', async (req, res) => {
-  const { id } = req.params;
+// DELETE
+app.delete('/api/admin/rabbits/:id', async (req, res) => {
   try {
-    const result = await pool.query('DELETE FROM rabbits WHERE rabbit_id = $1', [id]);
-    if (result.rowCount === 0) return res.status(404).json({ error: 'Rabbit not found' });
-    res.json({ message: 'Rabbit deleted' });
-  } catch (err) {
-    console.error('❌ Failed to delete rabbit:', err.message);
-    res.status(500).json({ error: 'Failed to delete rabbit' });
+    const q = await pool.query('DELETE FROM rabbits WHERE rabbit_id = $1', [req.params.id]);
+    if (q.rowCount === 0) return res.status(404).json({ error: 'not found' });
+    res.json({ ok: true });
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ error: 'Server error' });
   }
 });
+
+// ================== Product APIs ==================
+
+// GET list products (รองรับ ?page ?limit ?category แบบ case-insensitive)
+app.get('/api/admin/products', async (req, res) => {
+  try {
+    const page   = Math.max(parseInt(req.query.page  || '1', 10), 1);
+    const limit  = Math.max(parseInt(req.query.limit || '10', 10), 1);
+    const offset = (page - 1) * limit;
+
+    // ทำความสะอาดพารามิเตอร์
+    let category = (req.query.category ?? '').toString().trim();
+    // เผื่อคุณอยาก normalize ค่าบางกรณี (เช่น pet%20food → Pet food)
+    if (category) {
+      const c = category.toLowerCase();
+      if (c === 'petfood' || c === 'pet_food') category = 'Pet food';
+      else if (c === 'equipment' || c === 'equip') category = 'Equipment';
+      // ไม่งั้นก็ปล่อยค่าที่ส่งมาไป (และเทียบแบบ LOWER ด้านล่าง)
+    } else {
+      category = null;
+    }
+
+    let totalQ, rowsQ;
+
+    if (category) {
+      // เทียบแบบ case-insensitive
+      totalQ = await pool.query(
+        'SELECT COUNT(*)::int AS total FROM products WHERE LOWER(category) = LOWER($1)',
+        [category]
+      );
+      rowsQ = await pool.query(
+        `SELECT product_id, seller_id, name, category, price, stock, description, image_url, status
+         FROM products
+         WHERE LOWER(category) = LOWER($1)
+         ORDER BY product_id ASC
+         LIMIT $2 OFFSET $3`,
+        [category, limit, offset]
+      );
+    } else {
+      totalQ = await pool.query('SELECT COUNT(*)::int AS total FROM products');
+      rowsQ = await pool.query(
+        `SELECT product_id, seller_id, name, category, price, stock, description, image_url, status
+         FROM products
+         ORDER BY product_id ASC
+         LIMIT $1 OFFSET $2`,
+        [limit, offset]
+      );
+    }
+
+    const total = totalQ.rows[0].total || 0;
+    res.json({
+      page,
+      limit,
+      total,
+      totalPages: Math.ceil(total / limit),
+      items: rowsQ.rows,
+    });
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// POST add product
+app.post('/api/admin/products', async (req, res) => {
+  try {
+    const {
+      seller_id = null,
+      name, category, price, stock = 0,
+      description = null, image_url = null, status = 'available'
+    } = req.body;
+
+    if (!name || !price || !category) {
+      return res.status(400).json({ error: 'name, price, category จำเป็น' });
+    }
+
+    const q = await pool.query(
+      `INSERT INTO products (seller_id, name, category, price, stock, description, image_url, status)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
+       RETURNING *`,
+      [seller_id, name, category, price, stock, description, image_url, status]
+    );
+
+    res.status(201).json(q.rows[0]);
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// PUT update product
+app.put('/api/admin/products/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const {
+      seller_id, name, category, price, stock,
+      description, image_url, status
+    } = req.body;
+
+    const q = await pool.query(
+      `UPDATE products SET
+         seller_id = COALESCE($1, seller_id),
+         name = COALESCE($2, name),
+         category = COALESCE($3, category),
+         price = COALESCE($4, price),
+         stock = COALESCE($5, stock),
+         description = COALESCE($6, description),
+         image_url = COALESCE($7, image_url),
+         status = COALESCE($8, status)
+       WHERE product_id = $9
+       RETURNING *`,
+      [seller_id, name, category, price, stock, description, image_url, status, id]
+    );
+
+    if (q.rowCount === 0) return res.status(404).json({ error: 'not found' });
+    res.json(q.rows[0]);
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+app.get('/api/admin/products/:id', async (req, res) => {
+  try {
+    const q = await pool.query(
+      'SELECT * FROM products WHERE product_id = $1',
+      [req.params.id]
+    );
+    if (q.rowCount === 0) return res.status(404).json({ error: 'not found' });
+    res.json(q.rows[0]);
+  } catch (e) {
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// DELETE product
+app.delete('/api/admin/products/:id', async (req, res) => {
+  try {
+    const q = await pool.query('DELETE FROM products WHERE product_id = $1', [req.params.id]);
+    if (q.rowCount === 0) return res.status(404).json({ error: 'not found' });
+    res.json({ ok: true });
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// (อย่าลืมส่วน listen ของแอปคุณ)
 
 /* ===================== OTP API ===================== */
 // ส่ง OTP ไปอีเมล

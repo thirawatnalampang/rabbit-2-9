@@ -24,6 +24,11 @@ import StatisticsPage from './pages/StatisticsPage';
 import SearchPage from './pages/SearchPage';
 import ParentsPage from './pages/ParentsPage'; 
 import BookingPage from './pages/BookingPage';
+import EditRabbitForm from './pages/EditRabbitForm'
+import AddProductForm from './pages/AddProductForm';
+import Category from './pages/Category';
+import ManageProducts from './pages/ManageProducts';
+import EditProductForm from './pages/EditProductForm';
 
 import './App.css';
 
@@ -57,6 +62,11 @@ function App() {
           <Route path="/search" element={<SearchPage />} />
           <Route path="/parents" element={<ParentsPage />} />
           <Route path="/booking" element={<BookingPage />} />
+          <Route path="/edit-rabbit/:id" element={<EditRabbitForm />} />
+          <Route path="/add-product" element={<AddProductForm />} />
+          <Route path="/category" element={<Category />} />
+          <Route path="/manage-products" element={<ManageProducts />} />
+          <Route path="/edit-product/:id" element={<EditProductForm />} />
 
           <Route path="*" element={<NotFound />} />
         </Routes>

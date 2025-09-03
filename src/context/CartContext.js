@@ -6,15 +6,22 @@ export function CartProvider({ children }) {
   const [cartItems, setCartItems] = useState([]);
 
   const addToCart = (item) => {
+    // ✅ normalize id ให้ทุกตัวมีค่า id
+    const id = item.id ?? item.product_id ?? item.rabbit_id;
+    const normalized = {
+      ...item,
+      id,
+      quantity: item.quantity || 1,
+    };
+
     setCartItems((prev) => {
-      // ถ้ามีอยู่แล้ว ให้เพิ่มจำนวนแทน
-      const exists = prev.find((i) => i.id === item.id);
+      const exists = prev.find((i) => i.id === id);
       if (exists) {
         return prev.map((i) =>
-          i.id === item.id ? { ...i, quantity: i.quantity + (item.quantity || 1) } : i
+          i.id === id ? { ...i, quantity: i.quantity + normalized.quantity } : i
         );
       }
-      return [...prev, { ...item, quantity: item.quantity || 1 }];
+      return [...prev, normalized];
     });
   };
 
@@ -22,8 +29,10 @@ export function CartProvider({ children }) {
     setCartItems((prev) => prev.filter((item) => item.id !== id));
   };
 
+  const clearCart = () => setCartItems([]); // ✅ เผื่ออยากเคลียร์ทั้งหมด
+
   return (
-    <CartContext.Provider value={{ cartItems, addToCart, removeFromCart }}>
+    <CartContext.Provider value={{ cartItems, addToCart, removeFromCart, clearCart }}>
       {children}
     </CartContext.Provider>
   );
