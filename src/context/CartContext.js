@@ -61,7 +61,7 @@ export function CartProvider({ children }) {
   const [cartItems, setCartItems] = useState([]);
   const prevUserIdRef = useRef(null);
 
-  // สลับระหว่าง guest <-> user อย่างถูกต้อง
+  // สลับระหว่าง guest <-> user อย่างถูกต้อง + migrate คีย์เก่า
   useEffect(() => {
     const currId = getUserId(user);
     const prevId = prevUserIdRef.current;
@@ -73,20 +73,20 @@ export function CartProvider({ children }) {
       localStorage.removeItem('cart');
     }
 
-    // เคส: เพิ่ง "ล็อกอิน" (จาก guest -> user)
+    // เคส: เพิ่ง "ล็อกอิน" (guest -> user)
     if (!prevId && currId) {
       const userKey = keyForUser(user);
       const guestCart = safeRead(GUEST_KEY);
       const userCart = safeRead(userKey);
       const merged = mergeCarts(userCart, guestCart);
       safeWrite(userKey, merged);
-      // ไม่ลบ guest เพื่อให้ตะกร้า guest ยังอยู่กรณีออกจากระบบ
+      // ไม่ลบ guest เพื่อใช้ต่อถ้าออกจากระบบ
       setCartItems(merged);
       prevUserIdRef.current = currId;
       return;
     }
 
-    // เคส: เพิ่ง "ล็อกเอาต์" (จาก user -> guest)
+    // เคส: เพิ่ง "ล็อกเอาต์" (user -> guest)
     if (prevId && !currId) {
       const prevUserKey = `cart:user:${prevId}`;
       const prevUserCart = safeRead(prevUserKey);
@@ -98,7 +98,7 @@ export function CartProvider({ children }) {
       return;
     }
 
-    // เคส: เปลี่ยนบัญชีผู้ใช้ (user A -> user B) หรือโหลดครั้งแรก
+    // เคส: เปลี่ยนบัญชีผู้ใช้ หรือโหลดครั้งแรก
     const currentKey = keyForUser(user);
     const current = safeRead(currentKey);
     setCartItems(current);
@@ -114,16 +114,39 @@ export function CartProvider({ children }) {
   /* ============ actions ============ */
   const addToCart = (item) => {
     const id = getUniqueId(item);
-    const qty = Number(item.quantity || 1);
+    const qty = Math.max(1, Number(item.quantity || item.qty || 1));
     setCartItems((prev) => {
       const exists = prev.find((i) => i.id === id);
       if (exists) {
         return prev.map((i) =>
           i.id === id ? { ...i, quantity: Number(i.quantity || 1) + qty } : i
         );
-        }
+      }
       return [...prev, { ...item, id, quantity: qty }];
     });
+  };
+
+  const increment = (id) => {
+    setCartItems((prev) =>
+      prev.map((i) => (i.id === id ? { ...i, quantity: Number(i.quantity || 1) + 1 } : i))
+    );
+  };
+
+  const decrement = (id) => {
+    setCartItems((prev) =>
+      prev
+        .map((i) => (i.id === id ? { ...i, quantity: Math.max(0, Number(i.quantity || 1) - 1) } : i))
+        .filter((i) => (Number(i.quantity) || 0) > 0) // เหลือ 0 = ลบทิ้ง
+    );
+  };
+
+  const setQty = (id, qty) => {
+    const q = Math.max(0, Number(qty) || 0);
+    setCartItems((prev) =>
+      prev
+        .map((i) => (i.id === id ? { ...i, quantity: q } : i))
+        .filter((i) => (Number(i.quantity) || 0) > 0)
+    );
   };
 
   const removeFromCart = (id) => {
@@ -132,7 +155,10 @@ export function CartProvider({ children }) {
 
   const clearCart = () => setCartItems([]);
 
-  const value = useMemo(() => ({ cartItems, addToCart, removeFromCart, clearCart }), [cartItems]);
+  const value = useMemo(
+    () => ({ cartItems, addToCart, increment, decrement, setQty, removeFromCart, clearCart }),
+    [cartItems]
+  );
 
   return <CartContext.Provider value={value}>{children}</CartContext.Provider>;
 }

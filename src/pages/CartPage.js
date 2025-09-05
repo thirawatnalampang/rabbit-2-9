@@ -1,3 +1,4 @@
+// src/pages/CartPage.jsx
 import { useAuth } from '../context/AuthContext';
 import { useCart } from '../context/CartContext';
 import { useNavigate, Link } from 'react-router-dom';
@@ -10,6 +11,7 @@ function getImage(it) {
   return it.image || it.image_url || it.img || it.photo || FALLBACK_IMG;
 }
 function getId(it) {
+  // ตอนนี้ id ในตะกร้าจะเป็น unique id แล้ว (type-baseId)
   return it.id ?? it.product_id ?? it.rabbit_id ?? it._id ?? String(it.name || Math.random());
 }
 function getName(it) {
@@ -38,7 +40,7 @@ function detailLink(it) {
 
 export default function CartPage() {
   const { user } = useAuth();
-  const { cartItems, removeFromCart } = useCart();
+  const { cartItems, increment, decrement, setQty, removeFromCart } = useCart();
   const navigate = useNavigate();
 
   const subtotal = cartItems.reduce((sum, it) => sum + getUnitPrice(it) * getQty(it), 0);
@@ -53,7 +55,7 @@ export default function CartPage() {
 
   return (
     <div className="max-w-6xl mx-auto px-4 md:px-6 py-8">
-      {/* หัวข้อ + breadcrumb เล็กๆ */}
+      {/* หัวข้อ + breadcrumb */}
       <div className="mb-6">
         <div className="text-sm text-neutral-500 mb-1">
           <Link to="/" className="hover:underline">หน้าแรก</Link> <span className="mx-1">/</span> ตะกร้า
@@ -74,12 +76,12 @@ export default function CartPage() {
           </div>
         </div>
       ) : (
-        // มีสินค้า: แบ่ง 2 คอลัมน์ (ซ้ายรายการ, ขวาสรุป)
+        // มีสินค้า: 2 คอลัมน์
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          {/* รายการสินค้า */}
+          {/* ซ้าย: รายการสินค้า */}
           <div className="md:col-span-2 space-y-4">
             {cartItems.map((item) => {
-              const id = getId(item);
+              const id = getId(item); // เป็น unique id อยู่แล้ว
               const qty = getQty(item);
               const unit = getUnitPrice(item);
               const name = getName(item);
@@ -88,10 +90,7 @@ export default function CartPage() {
               const type = getType(item);
 
               return (
-                <div
-                  key={id}
-                  className="bg-white border rounded-2xl p-4 shadow-sm hover:shadow-md transition"
-                >
+                <div key={id} className="bg-white border rounded-2xl p-4 shadow-sm hover:shadow-md transition">
                   <div className="flex gap-4">
                     <Link to={link} className="shrink-0">
                       <img
@@ -108,12 +107,49 @@ export default function CartPage() {
                           <Link to={link} className="text-lg font-semibold hover:underline line-clamp-1">
                             {name}
                           </Link>
+
                           <div className="mt-1 flex items-center gap-2 text-sm text-neutral-500">
                             <span className="px-2 py-0.5 rounded-full border text-xs">
                               {type === 'rabbit' ? 'กระต่าย' : type === 'pet-food' ? 'อาหารสัตว์' : 'อุปกรณ์'}
                             </span>
                             <span>•</span>
-                            <span>จำนวน: <span className="font-medium text-neutral-700">{qty}</span></span>
+
+                            {/* ตัวควบคุมจำนวน */}
+                            <div className="flex items-center gap-2">
+                              <button
+                                onClick={() => decrement(id)}
+                                className="w-8 h-8 rounded-full border flex items-center justify-center hover:bg-neutral-50"
+                                aria-label="ลดจำนวน"
+                                title="ลดจำนวน"
+                              >
+                                –
+                              </button>
+
+                              <input
+                                type="number"
+                                min={1}
+                                value={qty}
+                                onChange={(e) => {
+                                  const val = e.target.value;
+                                  if (val === '') return; // ปล่อยว่างชั่วคราว
+                                  const n = Math.max(0, Number(val) || 0);
+                                  setQty(id, n);
+                                }}
+                                onBlur={(e) => {
+                                  if (e.target.value === '') setQty(id, 1);
+                                }}
+                                className="w-14 text-center border rounded-lg py-1"
+                              />
+
+                              <button
+                                onClick={() => increment(id)}
+                                className="w-8 h-8 rounded-full border flex items-center justify-center hover:bg-neutral-50"
+                                aria-label="เพิ่มจำนวน"
+                                title="เพิ่มจำนวน"
+                              >
+                                +
+                              </button>
+                            </div>
                           </div>
                         </div>
 
@@ -141,7 +177,7 @@ export default function CartPage() {
             })}
           </div>
 
-          {/* สรุปคำสั่งซื้อ */}
+          {/* ขวา: สรุปคำสั่งซื้อ */}
           <aside className="md:col-span-1">
             <div className="bg-white border rounded-2xl p-5 shadow-sm md:sticky md:top-6">
               <h2 className="text-lg font-bold mb-4">สรุปคำสั่งซื้อ</h2>
@@ -170,10 +206,7 @@ export default function CartPage() {
                 ✅ ไปชำระเงิน
               </button>
 
-              <Link
-                to="/"
-                className="mt-3 block text-center text-sm text-neutral-600 hover:text-neutral-800"
-              >
+              <Link to="/" className="mt-3 block text-center text-sm text-neutral-600 hover:text-neutral-800">
                 ← ไปเลือกสินค้าต่อ
               </Link>
 
