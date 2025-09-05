@@ -11,8 +11,9 @@ function formatTHB(n) {
 export default function ManageRabbits() {
   const [rabbits, setRabbits] = useState([]);
   const [page, setPage] = useState(1);
-  const limit = 10;
+  const limit = 5; // <<< แสดง 5 ตัวต่อหน้า
   const [totalPages, setTotalPages] = useState(1);
+  const [total, setTotal] = useState(0); // เผื่อโชว์จำนวนทั้งหมด
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState(null);
 
@@ -27,7 +28,12 @@ export default function ManageRabbits() {
       }
       const data = await res.json();
       setRabbits(data.items || []);
-      setTotalPages(data.totalPages || 1);
+      // รองรับหลายรูปแบบจาก backend
+      const t = data.totalPages
+        ?? (data.total ? Math.ceil(Number(data.total) / limit) : null)
+        ?? (data.count ? Math.ceil(Number(data.count) / limit) : 1);
+      setTotalPages(t || 1);
+      setTotal(data.total ?? data.count ?? (data.items?.length || 0));
     } catch (e) {
       console.error('Fetch rabbits error:', e);
       setErr(e.message || 'Failed to fetch');
@@ -67,6 +73,12 @@ export default function ManageRabbits() {
          : g;
   };
 
+  const goToPage = (p) => {
+    if (p < 1 || p > totalPages) return;
+    setPage(p);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
   return (
     <div className="p-8 flex flex-col items-center">
       <h1 className="text-2xl font-bold mb-6 px-4 py-2 bg-pink-50 rounded shadow">
@@ -75,7 +87,7 @@ export default function ManageRabbits() {
 
       <div className="flex items-center gap-4 mb-8">
         <span className="bg-pink-100 px-4 py-2 rounded-full">
-          🐇 จัดการกระต่าย : {rabbits.length} ตัว (หน้า {page}/{totalPages})
+          🐇 ทั้งหมด {total} ตัว • แสดง {rabbits.length}/{limit} • หน้า {page}/{totalPages}
         </span>
         <Link
           to="/add-rabbit"
@@ -98,7 +110,7 @@ export default function ManageRabbits() {
             <img
               src={r.image_url || 'https://placehold.co/200x200?text=Rabbit'}
               alt={r.name}
-              className="W-32 h-32 object-cover rounded-lg shadow"
+              className="w-32 h-32 object-cover rounded-lg shadow" // << แก้ W-32 เป็น w-32
               onError={(e) => { e.currentTarget.src = 'https://placehold.co/200x200?text=Rabbit'; }}
             />
             <div className="flex-1 bg-gray-100 p-4 rounded-lg">
@@ -133,18 +145,53 @@ export default function ManageRabbits() {
         ))}
       </div>
 
-      <div className="flex gap-2 mt-8">
-        {Array.from({ length: totalPages }, (_, i) => i + 1).map(n => (
+      {/* Pagination */}
+      {totalPages > 1 && (
+        <div className="flex gap-2 mt-8">
           <button
-            key={n}
-            onClick={() => setPage(n)}
-            disabled={page === n}
-            className={`px-3 py-1 rounded-full ${page === n ? 'bg-black text-white cursor-not-allowed' : 'hover:bg-gray-200'}`}
+            onClick={() => goToPage(1)}
+            disabled={page === 1}
+            className="px-3 py-1 rounded-full border disabled:opacity-50"
           >
-            {n}
+            ⟪
           </button>
-        ))}
-      </div>
+          <button
+            onClick={() => goToPage(page - 1)}
+            disabled={page === 1}
+            className="px-3 py-1 rounded-full border disabled:opacity-50"
+          >
+            «
+          </button>
+
+          {Array.from({ length: totalPages }, (_, i) => i + 1).map(n => (
+            <button
+              key={n}
+              onClick={() => goToPage(n)}
+              disabled={page === n}
+              className={`px-3 py-1 rounded-full border ${
+                page === n ? 'bg-black text-white cursor-not-allowed' : 'hover:bg-gray-100'
+              }`}
+            >
+              {n}
+            </button>
+          ))}
+
+          <button
+            onClick={() => goToPage(page + 1)}
+            disabled={page === totalPages}
+            className="px-3 py-1 rounded-full border disabled:opacity-50"
+          >
+            »
+          </button>
+          <button
+            onClick={() => goToPage(totalPages)}
+            disabled={page === totalPages}
+            className="px-3 py-1 rounded-full border disabled:opacity-50"
+          >
+            ⟫
+          </button>
+        </div>
+      )}
     </div>
   );
 }

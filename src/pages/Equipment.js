@@ -50,7 +50,7 @@ export default function Equipment() {
 
   return (
     <div className="p-8">
-      <h1 className="text-2xl font-bold mb-8 text-center">อุปกรณ์สัตว์เลี้ยง</h1>
+      <h1 className="text-2xl font-bold mb-8 text-center">อุปกรณ์กระต่าย</h1>
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-6 mb-10">
         {currentItems.map((item) => (

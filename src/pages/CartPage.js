@@ -41,9 +41,7 @@ export default function CartPage() {
   const { cartItems, removeFromCart } = useCart();
   const navigate = useNavigate();
 
-  const totalPrice = cartItems.reduce((sum, it) => {
-    return sum + getUnitPrice(it) * getQty(it);
-  }, 0);
+  const subtotal = cartItems.reduce((sum, it) => sum + getUnitPrice(it) * getQty(it), 0);
 
   const handleCheckout = () => {
     if (!user) {
@@ -54,14 +52,32 @@ export default function CartPage() {
   };
 
   return (
-    <div className="max-w-3xl mx-auto p-6 mt-6">
-      <h1 className="text-3xl font-bold mb-6">🛒 ตะกร้าของคุณ</h1>
+    <div className="max-w-6xl mx-auto px-4 md:px-6 py-8">
+      {/* หัวข้อ + breadcrumb เล็กๆ */}
+      <div className="mb-6">
+        <div className="text-sm text-neutral-500 mb-1">
+          <Link to="/" className="hover:underline">หน้าแรก</Link> <span className="mx-1">/</span> ตะกร้า
+        </div>
+        <h1 className="text-3xl font-extrabold tracking-tight flex items-center gap-2">
+          <span>🛒</span> ตะกร้าของคุณ
+        </h1>
+      </div>
 
+      {/* ว่างเปล่า */}
       {cartItems.length === 0 ? (
-        <p className="text-center text-gray-500">ไม่มีสินค้าในตะกร้า</p>
+        <div className="bg-white rounded-2xl shadow-sm border p-10 text-center">
+          <p className="text-lg text-neutral-600">ยังไม่มีสินค้าในตะกร้า</p>
+          <div className="mt-6 flex flex-wrap justify-center gap-3">
+            <Link to="/pets" className="px-4 py-2 rounded-full border hover:bg-neutral-50">ดูรายการกระต่าย</Link>
+            <Link to="/pet-food" className="px-4 py-2 rounded-full border hover:bg-neutral-50">อาหารสัตว์เลี้ยง</Link>
+            <Link to="/equipment" className="px-4 py-2 rounded-full border hover:bg-neutral-50">อุปกรณ์</Link>
+          </div>
+        </div>
       ) : (
-        <>
-          <div className="space-y-4">
+        // มีสินค้า: แบ่ง 2 คอลัมน์ (ซ้ายรายการ, ขวาสรุป)
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          {/* รายการสินค้า */}
+          <div className="md:col-span-2 space-y-4">
             {cartItems.map((item) => {
               const id = getId(item);
               const qty = getQty(item);
@@ -69,56 +85,104 @@ export default function CartPage() {
               const name = getName(item);
               const img = getImage(item);
               const link = detailLink(item);
+              const type = getType(item);
 
               return (
                 <div
                   key={id}
-                  className="flex items-center border rounded-lg p-4 shadow-md bg-white"
+                  className="bg-white border rounded-2xl p-4 shadow-sm hover:shadow-md transition"
                 >
-                  <Link to={link} className="shrink-0">
-                    <img
-                      src={img}
-                      alt={name}
-                      className="w-24 h-24 rounded-md object-cover"
-                      onError={(e) => {
-                        e.currentTarget.src = FALLBACK_IMG;
-                      }}
-                    />
-                  </Link>
-
-                  <div className="ml-4 flex-1">
-                    <Link to={link} className="text-xl font-semibold hover:underline">
-                      {name}
+                  <div className="flex gap-4">
+                    <Link to={link} className="shrink-0">
+                      <img
+                        src={img}
+                        alt={name}
+                        className="w-24 h-24 rounded-xl object-cover"
+                        onError={(e) => { e.currentTarget.src = FALLBACK_IMG; }}
+                      />
                     </Link>
-                    <p className="text-sm text-gray-500">จำนวน: {qty}</p>
-                    <p className="text-pink-600 font-semibold mt-1">
-                      {formatTHB(unit * qty)}
-                    </p>
-                  </div>
 
-                  <button
-                    onClick={() => removeFromCart(getId(item))}
-                    className="ml-4 px-3 py-1 bg-red-500 text-white rounded hover:bg-red-600"
-                  >
-                    ลบ
-                  </button>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-start justify-between gap-4">
+                        <div className="min-w-0">
+                          <Link to={link} className="text-lg font-semibold hover:underline line-clamp-1">
+                            {name}
+                          </Link>
+                          <div className="mt-1 flex items-center gap-2 text-sm text-neutral-500">
+                            <span className="px-2 py-0.5 rounded-full border text-xs">
+                              {type === 'rabbit' ? 'กระต่าย' : type === 'pet-food' ? 'อาหารสัตว์' : 'อุปกรณ์'}
+                            </span>
+                            <span>•</span>
+                            <span>จำนวน: <span className="font-medium text-neutral-700">{qty}</span></span>
+                          </div>
+                        </div>
+
+                        <button
+                          onClick={() => removeFromCart(id)}
+                          className="text-red-600 hover:text-red-700 text-sm px-3 py-1 rounded-full border border-red-200 hover:bg-red-50"
+                          title="ลบออกจากตะกร้า"
+                        >
+                          ลบ
+                        </button>
+                      </div>
+
+                      <div className="mt-3 flex items-center justify-between">
+                        <div className="text-sm text-neutral-500">
+                          ราคาต่อหน่วย: <span className="font-medium text-neutral-700">{formatTHB(unit)}</span>
+                        </div>
+                        <div className="text-lg font-bold text-emerald-600">
+                          {formatTHB(unit * qty)}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
                 </div>
               );
             })}
           </div>
 
-          <div className="mt-6 border-t pt-4 flex justify-between items-center text-xl font-semibold">
-            <span>ราคารวม</span>
-            <span className="text-green-600">{formatTHB(totalPrice)}</span>
-          </div>
+          {/* สรุปคำสั่งซื้อ */}
+          <aside className="md:col-span-1">
+            <div className="bg-white border rounded-2xl p-5 shadow-sm md:sticky md:top-6">
+              <h2 className="text-lg font-bold mb-4">สรุปคำสั่งซื้อ</h2>
 
-          <button
-            onClick={handleCheckout}
-            className="mt-6 block w-full bg-pink-500 hover:bg-pink-600 text-white font-bold py-3 rounded-full shadow-lg transition-transform transform hover:scale-105"
-          >
-            ✅ ไปชำระเงิน
-          </button>
-        </>
+              <div className="space-y-2 text-sm">
+                <div className="flex justify-between">
+                  <span>ยอดรวมสินค้า</span>
+                  <span className="font-medium">{formatTHB(subtotal)}</span>
+                </div>
+                <div className="flex justify-between text-neutral-500">
+                  <span>ค่าจัดส่ง</span>
+                  <span>คำนวณตอนชำระเงิน</span>
+                </div>
+              </div>
+
+              <div className="my-4 border-t" />
+              <div className="flex justify-between items-center text-base font-semibold">
+                <span>ราคารวม</span>
+                <span className="text-emerald-600">{formatTHB(subtotal)}</span>
+              </div>
+
+              <button
+                onClick={handleCheckout}
+                className="mt-5 w-full bg-pink-500 hover:bg-pink-600 text-white font-semibold py-3 rounded-xl shadow-md transition-transform hover:scale-[1.01] active:scale-[0.99]"
+              >
+                ✅ ไปชำระเงิน
+              </button>
+
+              <Link
+                to="/"
+                className="mt-3 block text-center text-sm text-neutral-600 hover:text-neutral-800"
+              >
+                ← ไปเลือกสินค้าต่อ
+              </Link>
+
+              <p className="mt-4 text-xs text-neutral-500">
+                * โปรดตรวจสอบรายการและจำนวนให้ถูกต้องก่อนดำเนินการชำระเงิน
+              </p>
+            </div>
+          </aside>
+        </div>
       )}
     </div>
   );

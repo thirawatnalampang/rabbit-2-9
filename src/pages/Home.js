@@ -17,10 +17,10 @@ const FALLBACKS = {
 
 export default function Home() {
   const categories = useMemo(() => ([
-    { title: 'Rabbit',    link: '/pets',       img: '/images/rabbit.jpg' },
-    { title: 'Pet food',  link: '/pet-food',   img: '/images/food.jpg' },
-    { title: 'Equipment', link: '/equipment',  img: '/images/live.jpg' },
-    { title: 'Parents',   link: '/parents',    img: '/images/parents.jpg' },
+    { title: 'กระต่าย',    link: '/pets',       img: '/images/rabbit.jpg' },
+    { title: 'อาหารกระต่าย',  link: '/pet-food',   img: '/images/food.jpg' },
+    { title: 'อุปกรณ์กระต่าย', link: '/equipment',  img: '/images/live.jpg' },
+    { title: 'ยืมกระต่าย',   link: '/parents',    img: '/images/parents.jpg' },
   ]), []);
 
   const [rabbits, setRabbits]   = useState([]);
@@ -69,7 +69,7 @@ export default function Home() {
       {/* ========== Category ==========
           (ยังใช้รูป/ลิงก์เดิมของคุณ) */}
       <div className="flex flex-col items-center mb-10">
-        <h1 className="text-4xl font-bold mb-8">Category</h1>
+        <h1 className="text-4xl font-bold mb-8">หมวดหมู่</h1>
         <div className="flex flex-wrap justify-center gap-6">
           {categories.map((cat, idx) => (
             <Link to={cat.link} key={idx} className="text-center">
